@@ -1,0 +1,29 @@
+#!/bin/bash
+port="65000"
+forbidden="forbidden_sites.txt"
+log="access_log.txt"
+site="pubs.opengroup.org"
+path="/onlinepubs/7908799/xns/send.html
+"
+for j in {1..10}
+do
+	for i in {1..50}
+	do
+        	curl -x http://127.0.0.1:$port/ $site$path -I > ${i} &
+			#sleep 0.1
+			#PID=$!
+			#kill $PID
+	done
+
+	wait
+
+	curl https://$site$path -I > out
+
+	for i in {1..50}
+	do
+		diff out ${i}
+		rm ${i}
+	done
+done
+
+pkill -f "./bin/myproxy $port $forbidden $log"

@@ -1,0 +1,19 @@
+For this program I managed the connections using threads. As mentioned in the README.md I used 
+https://www.youtube.com/watch?v=xoXzp4B8aQk&list=PLfqABt5AS4FmuQf70psXrsMLEDQXNkLq2&index=5 (CodeVault video) 
+and https://www.youtube.com/watch?v=Pg_4Jz8ZIH4 (Jacob Sorber Video) to make threads. It is a simple loop where the proxy listens for 
+connections. When a connection is requested the proxy accepts the connection assigning a socket to that connection. That socket is then put into
+an argument structure along with other arguments that are used by each thread and are passed into a new thread. Within the thread the client's 
+request (header) is read in and parsed to find the host name. With the host name DNS lookup findes the IP of the server.
+The proxy then makes a TCP connection with the server and then establishes a SSL connection. The packets recived from the server are then
+sent to the client immediatly.
+
+While parsing through the header we make sure that the URL is not forbidden and that it is either a GET or HEAD request.
+
+If a Ctrl C signal is recived the signal handler will increment a global variable (version). While reciving and sending packets from the
+server and to the client, the proxy makes sure that the version of its forbidden file has not been changed. If it has it check to see if
+its URL is forbidden, if it is, then it returns a URL Forbidden to the client.
+
+
+Connection Cleanup:
+To clean up connections I make sure to close both sockets (plus SSL) and free SSL whenever the thread is being exited - wheather it is 
+because the request has been fullfilled or because of error.

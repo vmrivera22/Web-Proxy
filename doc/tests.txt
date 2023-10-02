@@ -1,0 +1,120 @@
+Five Tests:
+
+1. Using a normal curl request:
+    Command Used Proxy: (Used to start the proxy)
+        "./myproxy 65000 forbidden_sites.txt access_log.txt"
+    Command Used Curl-Proxy: (Reroutes curl through the proxy)
+        "curl -x http://127.0.0.1:65000/ http://www.example.com -o proxyout.txt"
+    Command Used Curl (without proxy): (Uses curl without rerouting to the proxy)
+        "curl http://www.example.com -o curlout.txt"
+
+    File Parameters:
+        forbidden_sites.txt: empty file
+        access_log.txt: nonexistent before test
+
+    Results:
+        For this test the forbidden_sites.txt file was made empty so that no sites were forbidden.
+        
+        The used commands resulted in two output files, proxyout.txt and curlout.txt. Both files were compared using the command:
+        "diff proxyout.txt curlout.txt" 
+        which showed that the files were the same.
+
+        Additionally the access_log.txt file was created and the entry:
+        "2023-03-15T21:56:21.722Z 127.0.0.1 "GET http://www.example.com/ HTTP/1.1" 200 1256"
+        was added. 
+
+
+2. Using a curl request to a URL in the forbidden sites file:
+    Command Used Proxy: (Used to start the proxy)
+        "./myproxy 65000 forbidden_sites.txt access_log.txt"
+    Command Used Curl-Proxy: (Reroutes curl through the proxy)
+        "curl -x http://127.0.0.1:65000/ http://www.example.com -o proxyout.txt"
+    Command Used Curl (without proxy): (Uses curl without rerouting to the proxy)
+        "curl http://www.example.com -o curlout.txt"
+    
+    File Parameters:
+        forbidden_sites.txt: "http://www.example.com"
+        access_log.txt: had 1 entery
+
+    Results:
+        For this test the URL of the site we were trying to access was in the frobidden sites file.
+
+        The commands used resulted in the proxy sending "HTTP/1.1 403 Forbidden\r\n\r\n" to the client. The proxy then closed
+        the connection to the client and exited the thread (not the whole program). The proxy also output "403 Forbidden.\n" to
+        standard error.
+
+        Additionally the corresponding entry was appended to the access_log.txt file:
+        "2023-03-16T23:15:08.732Z 127.0.0.1 "GET http://www.example.com/ HTTP/1.1" 403 26"
+
+
+3. Using currl to request a https URL:
+    Command Used Proxy: (Used to start the proxy)
+        "./myproxy 65000 forbidden_sites.txt access_log.txt"
+    Command Used Curl-Proxy: (Reroutes curl through the proxy)
+        "curl -x http://127.0.0.1:65000/ https://www.example.com -o proxyout.txt"
+
+    File Parameters:
+        forbidden_sites.txt: empty
+        access_log.txt: had 2 enteries
+
+    Results:
+        Sending an https scheme URL resulted in the proxy receving a CONNECT request. Therefore, since the proxy is not supporting
+        this, the proxy output "501 Not implemented.\n" to standard error. It also sent the client 
+        "HTTP/1.1 501 Not implemented\r\n\r\n" which in turn resulted in a Curl output of:
+        "HTTP/1.1 501 Not implemented
+
+        curl: (56) Received HTTP code 501 from proxy after CONNECT"
+
+        Additionally the corresponding entry was appended to the access_log.txt file:
+        "2023-03-17T09:36:45.057Z 127.0.0.1 "CONNECT www.example.com:443 HTTP/1.1" 501 32"
+
+
+
+
+4. Running a script to test 50 concurrent curl requests:
+    Command Used Proxy:
+        "./myproxy 65000 forbidden_sites.txt access_log.txt"
+    Command Used to start Script:
+        "bash script2"
+
+    Note: The used script for this test is included in the documentation directory for reference.
+
+    Script Purpose and Results:
+        The purpose of this script was to test the concurrency of the proxy. 
+        
+        The script made it so that:
+        "curl -x http://127.0.0.1:65000/ pubs.opengroup.org/onlinepubs/7908799/xns/send.html > ${i} &" 
+        was ran 50 times (with i incrementing by 1 every time) (this is curl rerouted to the proxy). This resulted 
+        in 50 different output files. 
+
+        Additionally the script ran curl on the same web site without passing through the proxy the same amount of times:
+        "curl pubs.opengroup.org/onlinepubs/7908799/xns/send.html".
+
+        The script then compared the output files from the rerouted curl to the files from the normal curl. This showed that 
+        the files were the same. 
+
+         
+
+
+5. Testing the behavior of the proxy if the client goes down (using a script):
+    Command Used Proxy:
+        "./myproxy 65000 forbidden_sites.txt access_log.txt"
+    Command Used to start Script:
+        "bash script2"
+
+    Script Purpose and Results:
+        The purpose of this script was to test the behavior of the proxy if the client became unreachable while sending it
+        data.
+
+        For this test I used a similar script as the previous test. The only modifications were to add:
+            sleep 0.1
+			PID=$!
+			kill $PID
+        after calling:
+        "curl -x http://127.0.0.1:65000/ pubs.opengroup.org/onlinepubs/7908799/xns/send.html > ${i} &".
+        This made it so that the curl process was killed before everything was returned to the client.
+
+        This resulted in the Proxy reciving a SIGPIPE signal. The proxy caught the signal and output: 
+        "Broken Pipe. Host (client) became unreachable.
+        TCP Peer Unrechable. SIGPIPE ERROR."
+        to standard error.
